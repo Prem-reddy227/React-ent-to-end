@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Smart Home Loan EMI Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Chart.js for visualization (CDN, no setup needed) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(135deg, #1f2933, #111827);
+      color: #111827;
+      padding: 20px;
+    }
+    .page {
+      max-width: 1100px;
+      margin: 0 auto;
+      background: #f9fafb;
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+    }
+    header {
+      padding: 24px 32px;
+      background: linear-gradient(90deg, #2563eb, #10b981);
+      color: #f9fafb;
+    }
+    header h1 { font-size: 1.8rem; margin-bottom: 6px; }
+    header p { opacity: 0.9; }
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+      gap: 24px;
+      padding: 24px 28px 28px;
+    }
+    @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+
+    .card {
+      background: #ffffff;
+      border-radius: 14px;
+      padding: 18px 18px 20px;
+      box-shadow: 0 8px 18px rgba(15,23,42,0.08);
+    }
+    .card h2 {
+      font-size: 1.1rem;
+      margin-bottom: 10px;
+      color: #111827;
+    }
+    .field { margin-bottom: 14px; }
+    .field label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.9rem;
+      color: #374151;
+      margin-bottom: 4px;
+    }
+    .field input[type="number"],
+    .field input[type="range"] {
+      width: 100%;
+    }
+    .field input[type="number"] {
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      font-size: 0.95rem;
+    }
+    .field input[type="range"] {
+      appearance: none;
+      height: 6px;
+      border-radius: 999px;
+      background: #e5e7eb;
+      outline: none;
+    }
+    .field input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 999px;
+      background: #2563eb;
+      cursor: pointer;
+      border: 2px solid #ffffff;
+      box-shadow: 0 0 0 2px rgba(37,99,235,0.4);
+    }
+    .field span.helper {
+      font-size: 0.8rem;
+      color: #6b7280;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .summary-item {
+      background: #eff6ff;
+      border-radius: 10px;
+      padding: 8px 10px;
+      text-align: center;
+    }
+    .summary-item h3 {
+      font-size: 0.75rem;
+      color: #1d4ed8;
+      margin-bottom: 2px;
+    }
+    .summary-item p {
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: #111827;
+    }
+
+    .suggestions {
+      margin-top: 12px;
+    }
+    .suggestion-tagline {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #6b7280;
+      margin-bottom: 4px;
+    }
+    .suggestion {
+      font-size: 0.85rem;
+      padding: 8px 10px;
+      border-radius: 10px;
+      margin-bottom: 6px;
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
+    .suggestion strong { display: block; margin-bottom: 1px; }
+    .suggestion--green {
+      background: #ecfdf5;
+      border-left: 3px solid #10b981;
+      color: #065f46;
+    }
+    .suggestion--amber {
+      background: #fffbeb;
+      border-left: 3px solid #f59e0b;
+      color: #92400e;
+    }
+    .suggestion--blue {
+      background: #eff6ff;
+      border-left: 3px solid #2563eb;
+      color: #1d4ed8;
+    }
+
+    .chart-wrapper {
+      margin-top: 10px;
+    }
+    .chart-legend {
+      display: flex;
+      gap: 12px;
+      margin-top: 6px;
+      font-size: 0.8rem;
+      color: #4b5563;
+      flex-wrap: wrap;
+    }
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      display: inline-block;
+      margin-right: 4px;
+    }
+
+    footer {
+      padding: 10px 20px 16px;
+      font-size: 0.78rem;
+      color: #9ca3af;
+      text-align: center;
+      background: #0b1120;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>Smart Home Loan EMI Visualizer</h1>
+      <p>
+        Fixed‑interest EMI calculator with principal vs. interest chart and
+        instant suggestions to optimize your loan.
+      </p>
+    </header>
+
+    <main>
+      <!-- LEFT: Inputs & summary -->
+      <section class="card">
+        <h2>Loan Inputs</h2>
+
+        <div class="field">
+          <label>
+            <span>Property Price (₹)</span>
+            <span id="priceDisplay" class="helper"></span>
+          </label>
+          <input
+            type="number"
+            id="price"
+            value="5000000"
+            min="500000"
+            max="100000000"
+            step="50000"
+          />
+          <span class="helper">Total property value you are considering.</span>
+        </div>
+
+        <div class="field">
+          <label>
+            <span>Loan Percentage (%)</span>
+            <span id="loanPercentDisplay" class="helper"></span>
+          </label>
+          <input
+            type="range"
+            id="loanPercent"
+            value="80"
+            min="50"
+            max="90"
+          />
+          <span id="loanAmountDisplay" class="helper"></span>
+        </div>
+
+        <div class="field">
+          <label>
+            <span>Fixed Interest Rate (% p.a.)</span>
+            <span class="helper">Bank‑offered annual rate.</span>
+          </label>
+          <input
+            type="number"
+            id="interest"
+            value="8.5"
+            min="5"
+            max="15"
+            step="0.1"
+          />
+        </div>
+
+        <div class="field">
+          <label>
+            <span>Tenure (Years)</span>
+            <span class="helper">Typical home loans: 10–30 years.</span>
+          </label>
+          <input
+            type="number"
+            id="tenure"
+            value="20"
+            min="5"
+            max="40"
+            step="1"
+          />
+        </div>
+
+        <div class="summary-grid" id="summaryGrid">
+          <div class="summary-item">
+            <h3>Monthly EMI</h3>
+            <p id="emiText">–</p>
+          </div>
+          <div class="summary-item">
+            <h3>Total Interest</h3>
+            <p id="interestText">–</p>
+          </div>
+          <div class="summary-item">
+            <h3>Total Payment</h3>
+            <p id="totalText">–</p>
+          </div>
+        </div>
+
+        <div class="suggestions" id="suggestions">
+          <!-- dynamic suggestions -->
+        </div>
+      </section>
+
+      <!-- RIGHT: Chart & explanation -->
+      <section class="card">
+        <h2>EMI Breakdown</h2>
+        <p style="font-size:0.85rem; color:#4b5563; margin-bottom:6px;">
+          EMI stays fixed every month in a fixed‑rate loan, but the share of
+          principal and interest changes over time. The chart shows the total
+          share paid toward principal vs. interest over the full tenure.
+        </p>
+
+        <div class="chart-wrapper">
+          <canvas id="emiChart" height="220"></canvas>
+          <div class="chart-legend">
+            <span>
+              <span class="legend-dot" style="background:#2563eb;"></span>
+              Principal (your actual borrowed amount)
+            </span>
+            <span>
+              <span class="legend-dot" style="background:#f97316;"></span>
+              Interest (extra paid to the bank)
+            </span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      Demo only. For learning how EMI and visualizations work in a real estate
+      website front‑end.
+    </footer>
+  </div>
+
+  <script>
+    const priceEl = document.getElementById("price");
+    const loanPercentEl = document.getElementById("loanPercent");
+    const interestEl = document.getElementById("interest");
+    const tenureEl = document.getElementById("tenure");
+
+    const priceDisplay = document.getElementById("priceDisplay");
+    const loanPercentDisplay = document.getElementById("loanPercentDisplay");
+    const loanAmountDisplay = document.getElementById("loanAmountDisplay");
+
+    const emiText = document.getElementById("emiText");
+    const interestText = document.getElementById("interestText");
+    const totalText = document.getElementById("totalText");
+    const suggestionsEl = document.getElementById("suggestions");
+
+    let chart;
+
+    function formatINR(num) {
+      if (!isFinite(num)) return "–";
+      return "₹" + Math.round(num).toLocaleString("en-IN");
+    }
+
+    function computeEmi(principal, annualRate, years) {
+      const r = annualRate / 100 / 12; // monthly
+      const n = years * 12; // months
+      if (r === 0) return principal / n;
+      const factor = Math.pow(1 + r, n);
+      const emi = (principal * r * factor) / (factor - 1);
+      const totalPayment = emi * n;
+      const totalInterest = totalPayment - principal;
+      return { emi, totalPayment, totalInterest, r, n };
+    }
+
+    function updateUI() {
+      const price = Number(priceEl.value) || 0;
+      const loanPercent = Number(loanPercentEl.value) || 0;
+      const rate = Number(interestEl.value) || 0;
+      const years = Number(tenureEl.value) || 0;
+
+      const principal = (price * loanPercent) / 100;
+
+      priceDisplay.textContent = formatINR(price);
+      loanPercentDisplay.textContent = loanPercent + "%";
+      loanAmountDisplay.textContent =
+        "Loan amount: " +
+        formatINR(principal) +
+        " • Down payment: " +
+        formatINR(price - principal);
+
+      if (!price || !loanPercent || !rate || !years) return;
+
+      const { emi, totalPayment, totalInterest } = computeEmi(
+        principal,
+        rate,
+        years
+      );
+
+      // Summary cards
+      emiText.textContent = formatINR(emi) + "/mo";
+      interestText.textContent = formatINR(totalInterest);
+      totalText.textContent = formatINR(totalPayment);
+
+      // Chart
+      updateChart(principal, totalInterest);
+
+      // Suggestions
+      renderSuggestions({
+        price,
+        principal,
+        emi,
+        totalInterest,
+        rate,
+        years,
+      });
+    }
+
+    function updateChart(principal, interest) {
+      const ctx = document.getElementById("emiChart").getContext("2d");
+
+      const data = {
+        labels: ["Principal", "Interest"],
+        datasets: [
+          {
+            data: [principal, interest],
+            backgroundColor: ["#2563eb", "#f97316"],
+            borderWidth: 0,
+          },
+        ],
+      };
+
+      if (chart) {
+        chart.data = data;
+        chart.update();
+        return;
+      }
+
+      chart = new Chart(ctx, {
+        type: "pie",
+        data,
+        options: {
+          plugins: {
+            legend: {
+              display: false,
+            },
+            tooltip: {
+              callbacks: {
+                label: function (context) {
+                  const label = context.label || "";
+                  const value = context.raw || 0;
+                  return label + ": " + formatINR(value);
+                },
+              },
+            },
+          },
+        },
+      });
+    }
+
+    function renderSuggestions({ price, principal, emi, totalInterest, rate, years }) {
+      const suggestions = [];
+
+      // 1) Down payment suggestion (reduce loan %)
+      const targetLoanPercent = Math.max(50, Number(loanPercentEl.value) - 10);
+      const targetPrincipal = (price * targetLoanPercent) / 100;
+      const { totalInterest: targetInterest1 } = computeEmi(
+        targetPrincipal,
+        rate,
+        years
+      );
+      const downPaymentExtra = principal - targetPrincipal;
+      const interestSaved1 = totalInterest - targetInterest1;
+
+      suggestions.push(`
+        <div class="suggestion suggestion--green">
+          <div>💰</div>
+          <div>
+            <strong>Increase down payment</strong>
+            If you increase your down payment by ${formatINR(
+              downPaymentExtra
+            )} (reduce loan from ${loanPercentEl.value}% to ${targetLoanPercent}%), you could save around ${formatINR(
+        interestSaved1
+      )} in interest over the full tenure.
+          </div>
+        </div>
+      `);
+
+      // 2) Shorter tenure suggestion
+      const shorterYears = Math.max(5, years - 5);
+      const { emi: emiShort, totalInterest: interestShort } = computeEmi(
+        principal,
+        rate,
+        shorterYears
+      );
+      const emiIncrease = emiShort - emi;
+      const interestSaved2 = totalInterest - interestShort;
+
+      suggestions.push(`
+        <div class="suggestion suggestion--amber">
+          <div>⏱️</div>
+          <div>
+            <strong>Try a shorter tenure</strong>
+            Reducing the tenure from ${years} to ${shorterYears} years increases EMI by about ${formatINR(
+        emiIncrease
+      )} per month, but can save roughly ${formatINR(
+        interestSaved2
+      )} in total interest.
+          </div>
+        </div>
+      `);
+
+      // 3) Rate negotiation suggestion
+      const improvedRate = Math.max(4, rate - 0.5);
+      const { totalInterest: interestBetterRate } = computeEmi(
+        principal,
+        improvedRate,
+        years
+      );
+      const interestSaved3 = totalInterest - interestBetterRate;
+
+      suggestions.push(`
+        <div class="suggestion suggestion--blue">
+          <div>📉</div>
+          <div>
+            <strong>Negotiate interest rate</strong>
+            If you negotiate the interest rate from ${rate.toFixed(
+              2
+            )}% to ${improvedRate.toFixed(
+        2
+      )}%, you could save around ${formatINR(
+        interestSaved3
+      )} in interest without changing your tenure.
+          </div>
+        </div>
+      `);
+
+      suggestionsEl.innerHTML = `
+        <div class="suggestion-tagline">Smart suggestions for this loan</div>
+        ${suggestions.join("")}
+      `;
+    }
+
+    priceEl.addEventListener("input", updateUI);
+    loanPercentEl.addEventListener("input", updateUI);
+    interestEl.addEventListener("input", updateUI);
+    tenureEl.addEventListener("input", updateUI);
+
+    // Initial render
+    updateUI();
+  </script>
+</body>
+</html>
